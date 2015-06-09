@@ -1,4 +1,4 @@
-# certificacion_de_calidad
+# Certificacion-de-Calidad
 
 ## Certificacion de Calidad en Educacion para las IES del Estado de Puebla.
 
