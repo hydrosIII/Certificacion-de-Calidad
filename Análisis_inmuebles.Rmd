@@ -1,0 +1,112 @@
+---
+title: "Untitled"
+author: "Carlos Jared Romero Reyes"
+date: "08/06/2015"
+output: html_document
+---
+
+Uno de los objetivos principales del CEMABE es conocer la infraestructura, el equipamiento y los servicios de los centros de trabajo educativos. Por ello el Cuestionario de Inmueblei indagó las características constructivas de la escuela, los servicios básicos disponibles, la infraestructura educativa y sanitaria, así como las condiciones de la misma; las medidas de protección civil implementadas y los recursos para emergencias disponible.
+
+EL Cuestionario de Inmueble recopiló diversa información que se puede resumir en el listado siguiente:
+
+* Datos de identificación del inmueble y del informante
+* Tipo de inmueble y dirección
+* Centros de trabajo y sus características generales
+* Características de la construcción del inmueble
+* Servicios básicos de los inmuebles
+* Servicios para personas con discapacidad y espacios para educación especial
+* Espacios disponibles para el servicio educativo
+* Capacidad instalada
+* Protección civil
+* Mantenimiento y rehabilitación
+
+
+```{r,message=FALSE,warning=FALSE,echo=FALSE}
+library(stringr)
+library(maptools)
+library(rgdal)
+library(ggplot2)
+library(dplyr)
+library(leaflet)
+
+datos_inmueb<- read.csv("TR_inmuebles_21.csv",fileEncoding="WINDOWS-1250",
+                      stringsAsFactors=F)
+
+catalogo<-read.csv("~/Dropbox/RichIT/Mejora_escuela_Puebla/CATALOGO_CT.csv",
+                   fileEncoding="WINDOWS-1250",stringsAsFactors=F)
+
+datos_INMB<-left_join(datos_inmueb,catalogo)
+
+datos_INMB$CVEGEO_AGEB<-paste0(datos_INMB$ENT,
+                          str_pad(datos_INMB$MUN,3,pad="0"),
+                          str_pad(datos_INMB$LOC,4,pad="0"),
+                          datos_INMB$AGEB,sep="")
+
+datos_INMB$CVEGEO_LOC<-paste0(datos_INMB$ENT,
+                        str_pad(datos_INMB$MUN,3,pad="0"),
+                        str_pad(datos_INMB$LOC,4,pad="0"),sep="")
+
+ageb_shp<-readOGR("/home/jared/Dropbox/Código útil/scince/shps/pue",
+                  "pue_ageb_urb")
+loc_rur_shp <- readOGR("/home/jared/Dropbox/Código útil/scince/shps/pue", 
+                       "pue_loc_rur")
+loc_urb_shp<-readOGR("/home/jared/Dropbox/Código útil/scince/shps/pue",
+                     "pue_loc_urb")
+
+puntos<-sapply(1:nrow(datos_INMB),function(i){
+  ageb<-datos_INMB[i,"CVEGEO_AGEB"]
+  loc<-datos_INMB[i,"CVEGEO_LOC"]
+  if(sum(ageb_shp$CVEGEO==ageb)>0){
+    coordinates(ageb_shp[ageb_shp$CVEGEO==ageb,])
+  }else if(sum(loc_rur_shp$CVEGEO==loc)>0) {
+    coordinates(loc_rur_shp[loc_rur_shp$CVEGEO==loc,])
+  }else if(sum(loc_urb_shp$CVEGEO==loc)>0) {
+    coordinates(loc_urb_shp[loc_urb_shp$CVEGEO==loc,])
+  }else{c(NA,NA)}
+})
+
+datos_INMB$lon<-t(puntos)[,1]
+datos_INMB$lat<-t(puntos)[,2]
+```
+
+
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE, fig.width=8}
+puebla<-readOGR("/home/jared/Dropbox/Código útil/scince/shps/pue","pue_estatal")
+
+municipios<-readRDS("/home/jared/Dropbox/Código útil/mapas_mun.rds")
+puebla_map<-municipios[municipios$CVE_ENT=="21",]
+
+ggplot()+
+  geom_point(data=datos_INMB, aes(x=lon,y=lat,colour=as.character(NIVEL)),size=2)+ 
+  geom_polygon(data=puebla_map,aes(x=long,y=lat,group=group),alpha=.1)+
+  coord_fixed(ratio = 1)+
+  theme(legend.position=c(.15,.8),
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  guides(colour=guide_legend(title="Nivel educativo"))+
+  scale_colour_brewer(palette="Set1")+
+  ggtitle("Centros educativos en Puebla")
+
+
+escuelas<-datos_INMB[,c("lon","lat","NIVEL","NOMBRECT")]
+set.seed(2705)
+escuelas_samp<-sample_n(escuelas,100)
+escuelas_samp$icono<-paste("esc",escuelas_samp$NIVEL,sep="_")
+escuelas<-escuelas_samp[complete.cases(escuelas_samp),]
+
+escuela<-iconList(
+  esc_1=makeIcon("School_160.png"),esc_2=makeIcon("School_161.png"),
+  esc_3=makeIcon("School_162.png"),esc_4=makeIcon("School_163.png"),
+  esc_5=makeIcon("School_164.png"),esc_6=makeIcon("School_165.png"),
+  esc_7=makeIcon("School_166.png"),esc_8=makeIcon("School_167.png"),
+  esc_9=makeIcon("School_168.png"))
+
+
+leaflet()%>%
+  addPolygons(data=puebla)%>%
+  addTiles()%>%
+  addMarkers(data=escuelas_samp,~lon,~lat, icon = ~escuela[icono],
+             popup=~NOMBRECT)
+```

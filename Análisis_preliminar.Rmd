@@ -1,0 +1,176 @@
+---
+title: "Explorar datos CEMABE 2013, Puebla"
+author: "Carlos Jared Romero Reyes"
+date: "05/06/2015"
+output: html_document
+---
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(knitr)
+library(DT)
+```
+
+
+El propósito fundamental del CEMABE fue captar las características específicas de las escuelas, maestros y alumnos de instituciones públicas y privadas de educación básica del sistema educativo escolarizado y especial, con el propósito de proveer información al Sistema de Información y Gestión Educativa del país.
+
+Existen 3 bases de datos a nivel Estado, la primera es referente al personal del centro de trabajo, el cuestionario se encuentra en la página 78 del documento de la báse metodológica. Un Centro de trabajo " es la unidad mínima de responsabilidad en la que se administran los recursos humanos, materiales y financieros que el gobierno federal asigna para la prestación de servicios de educación o de apoyo a la educación". La aplicación de este instrumento se abocó a aquellos centros de trabajo que en el momento del censo ofrecían educación preescolar, primaria o secundaria. 
+
+Este cuestionario está conformado por 168 preguntas, relacionadas con los siguientes aspectos:
+
+* Horario y sostenimiento 
+* Matrícula escolar
+* Equipamiento y uso de espacios educativos
+* Programas
+* Servicio de consulta o préstamo de libros
+* Equipo de cómputo y comunicaciones
+* Participación social
+* Datos de contacto
+
+La base de datos contiene infromación de 10,579 centros educativos que se encuentran en 217 municipios de Puebla.
+
+```{r,echo=FALSE,message=FALSE}
+centros_trabajo<-read.csv("/home/jared/Dropbox/RichIT/Mejora_escuela_Puebla/Puebla/TR_CENTROS_21.csv")
+
+conteo_CT<-centros_trabajo%>%
+  group_by(MUN)%>%
+  summarise(conteo=n())%>%
+  arrange(desc(conteo))
+
+mapas_mun<-readRDS("/home/jared/Dropbox/Código útil/mapas_mun.rds")
+mapas_puebla<-mapas_mun[mapas_mun$CVE_ENT=="21",]
+mapas_puebla$MUN<-as.integer(mapas_puebla$CVE_MUN)
+mapas_puebla<-left_join(mapas_puebla,conteo_CT)
+
+```
+
+```{r kable, echo=FALSE, fig.height=4,fig.width=3}
+tabla_1<-mapas_puebla%>%
+  arrange(desc(conteo))%>%
+  select(NOM_MUN,conteo)%>%
+  unique()
+
+rownames(tabla_1)<-NULL
+datatable(tabla_1, options = list(pageLength = 5))
+```
+
+```{r, echo=FALSE,fig.align='center'}
+ggplot(mapas_puebla, aes(x=long,y=lat,group=group, fill=conteo))+
+  geom_polygon()+ coord_fixed(ratio = 1)+
+  theme(legend.position=c(.15,.8),axis.text.x = element_blank(),
+        axis.text.y = element_blank(),axis.title.x = element_blank(),
+        axis.title.y = element_blank())+ggtitle("Centros educativos por Municipio")
+```
+
+Lo primero que notamos es que el Municipio de Puebla concentra gran cantidad de centros de trabajo respecto a los demás municipios, si lo excluimos del conteo la distribución sería la siguiente.
+
+```{r, echo=FALSE,fig.align='center'}
+ggplot(mapas_puebla[mapas_puebla$NOM_MUN!="Puebla",], 
+       aes(x=long,y=lat,group=group, fill=conteo))+
+  geom_polygon()+ coord_fixed(ratio = 1)+
+  theme(legend.position=c(.15,.8),axis.text.x = element_blank(),
+        axis.text.y = element_blank(),axis.title.x = element_blank(),
+        axis.title.y = element_blank())+ggtitle("Centros educativos por Municipio sin Puebla capital")
+```
+
+Una de las preguntas interesantes en este cuestionario es sobre la prcocedencia de los recursos para el pago de los maestros, que nos ayudará a identificár las escuelas que son privadas de las públicas, dentro de las públicas, determinar cuáles son financiadas por el gobierno federal, el estatal y el municipal.
+
+Notamos que la mayor parte de las escuelas son financiadas por el Gobierno Federal, 67%, y que le siguen las financiadas por el Gobierno Estatal, se debe resaltar el hecho de que este financiamiento no es excluyente, y que algunas escuelas son financiadas por ambas instituciones.
+
+El tercer tipo de escuela más popular son las que se financían con recursos de particulares, el 16% de las mismas.
+
+```{r,message=FALSE,warning=FALSE,echo=FALSE}
+pago_maestros<-centros_trabajo[,c("NOM_MUN","CLAVE_CT","P149","P150","P151","P152","P153","P154","P155")]%>%
+  gather(clave_pago,valor,3:9,na.rm=T)
+
+tabla_2<-pago_maestros%>%
+  group_by(clave_pago)%>%
+  dplyr::summarise(conteo=n())%>%
+  mutate(financía=c("Gobierno Federal","Gobierno Estatal","Gobierno Municipal",
+                    "Particulares","Asociación Padres de Familia","Consejo Escolar",
+                    "Organismo Autónomo"), 
+         Porcentaje=conteo/nrow(centros_trabajo))
+
+kable(tabla_2[,c(3,4)], digits=3)
+```
+
+Otra pregunta interesante es sobre la cantidad de alumnos que tiene cada centro, en promedio cada centro de trabajo tiene 138 alumnos, existiendo algunos centros con 6,000 alumnos. Si tomamos solo aquellos centros que cuyo número de alumnos no se encuentre en alguno de los extremos, podemos ver su histograma en la gráfica siguiente, donde vemos que la cantidad de alumnos más frecuente es de entre 30 y 40 alumnos.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,fig.align='center'}
+alumnos_centro<-centros_trabajo[,c("NOM_MUN","CLAVE_CT","P166")]
+quan<-quantile(alumnos_centro$P166,probs=c(.01,.99),na.rm=T)
+
+ggplot(subset(alumnos_centro,P166>quan[1] & P166<quan[2]),
+       aes(x=P166))+stat_bin(binwidth=10)+ggtitle("Alumnos por centro educativo")
+```
+
+Por otra parte, ver donde se encuentran la mayoría de los alumnos lo hacemos con el gráfico siguiente, que de nuevo observamos una gran concentración de observaciones en Puebla capital. Si quitamos este municipio junto con Tehuacán, podemos podemos distinguir mejor otros municipios que tienen una concentración grande de alumnos.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE, fig.align='center'}
+puebla<-mapas_mun[mapas_mun$CVE_ENT=="21",]
+puebla$MUN<-as.integer(mapas_puebla$CVE_MUN)
+
+alumnos_mun<-centros_trabajo%>%
+  group_by(MUN)%>%
+  dplyr::summarise(alumnos=sum(P166,na.rm=T))
+
+
+puebla_alumnos<-left_join(mapas_puebla,alumnos_mun)
+
+ggplot(puebla_alumnos, aes(x=long,y=lat,group=group, fill=alumnos))+
+  geom_polygon()+ coord_fixed(ratio = 1)+
+  theme(legend.position=c(.15,.8),axis.text.x = element_blank(),
+        axis.text.y = element_blank(),axis.title.x = element_blank(),
+        axis.title.y = element_blank()) + ggtitle("Número de alumnos por Municipio")
+
+ggplot(puebla_alumnos[puebla_alumnos$NOM_MUN!="Puebla" &
+                        puebla_alumnos$NOM_MUN!="Tehuacán",],
+       aes(x=long,y=lat,group=group, fill=alumnos))+
+  geom_polygon()+ coord_fixed(ratio = 1)+
+  theme(legend.position=c(.15,.8),axis.text.x = element_blank(),
+        axis.text.y = element_blank(),axis.title.x = element_blank(),
+        axis.title.y = element_blank())+ ggtitle("Número de alumnos por Municipio, sin Puebla ni Tehuacán")
+```
+
+Ahora respecto a el equipo del que disponen los Centros de Trabajo, vemos que son pocos los centros de trabajo que no tienen suficientes pizarrones, muebles donde se sienten los alumnos o los maestros, sin embargo son pocos los que cuentan con mobiliario especial para alumnos con discapacidad. Por otra parte, sorprendentemente hay varios centros que cuentan con cañones o proyectores.
+
+```{r,message=FALSE,warning=FALSE, echo=FALSE}
+equipo_puebla<-centros_trabajo[,c("NOM_MUN","CLAVE_CT","P216","P219","P231","P234","P237","P240")]
+
+equipo_puebla$P237_2<-equipo_puebla$P237
+equipo_puebla$P237_2[equipo_puebla$P237==0]<-2
+equipo_puebla$P237_2[equipo_puebla$P237>0 & equipo_puebla$P237<999 ]<-1
+equipo_puebla$P237_2[equipo_puebla$P237==999]<-9
+equipo_puebla$P237<-NULL
+
+tabla_3<-sapply(equipo_puebla[,seq(3,8)],function(x) prop.table(table(x)))
+rownames(tabla_3)<-c("sí","no","n.a.")
+colnames(tabla_3)<-c("Todas las aulas cuentan con pizarron",
+                     "Todos los alumnos tienen donde sentarse",
+                     "Todas las aulas cuentan con escritorio para el maestro",
+                     "Todas las aulas cuentan con silla para el maestro",
+                     "Cuentan con mobiliario para alumnos con discapacidad",
+                     "Cuentan con al menos un proyector o cañon")
+
+kable(tabla_3, digits=3)
+```
+
+Nos gustaría ubicar aquellos municipio cuyas escuelas tienen una alta carencia en los recursos mencionados arriba, por lo que filtramos para ubicar estas escuelas y ver en que municipios se localizan.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,fig.align='center'}
+carentes<-equipo_puebla%>%
+  filter(P216==2,P219==2,P231==2,P234==2,P240==2,P237_2==2)
+
+mapa_carentes<-inner_join(puebla,carentes)
+
+ggplot(mapa_carentes,aes(x=long,y=lat,group=group))+
+  geom_polygon(data=puebla,aes(x=long,y=lat,group=group))+
+  geom_polygon(color="red")+ coord_fixed(ratio = 1)+
+  theme(legend.position=c(.15,.8),axis.text.x = element_blank(),
+        axis.text.y = element_blank(),axis.title.x = element_blank(),
+        axis.title.y = element_blank())+ ggtitle("Municipios con escuelas más carentes")
+```
+
+
