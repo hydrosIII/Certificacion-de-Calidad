@@ -4,3 +4,4 @@
 
 El proyecto busca mejorar la calidad de la educacion en el Estado de Puebla a traves de un analisis de los datos acerca de los recursos que se emplean en la enseñanza y los resultados que se han obtenido con dichos recursos.
 
+Pagina de preview, el html fue generado con R y luego adaptado.
