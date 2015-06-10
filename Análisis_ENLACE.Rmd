@@ -1,0 +1,126 @@
+---
+title: "Histórico prueba ENLACE"
+author: "Carlos Jared Romero Reyes"
+date: "09/06/2015"
+output: html_document
+---
+
+Ahora analizaremos los resultados de las pruebas ENLACE. Para realizar este análisis y comparar resultados, tanto a lo largo del tiempo como por el tipo de escuela, tenemos que ajustar los mismos tomando en consideración los promedios nacionales a lo largo de los años, como también los promedios dependiendo del tipo de escuela, ya que no sería justo comparar escuelas dirigidas a la comunidad indígena con escuelas particulares, o no es prudente comparar resultados del año 2009 con el 2013. 
+
+Dado lo anterior, hemos decidido presentar los resultados no por el promedio de resultados que obtiene cada escuela, que es tal como viene en la base de datos, sino a este promedio restarle el promedio nacional de acuerdo al año y tipo de escuela. De esta forma, esta diferencia nos dice que tan alejados del promedio nacional estamos y por tanto que tan bien o mal se está respecto a los otros.
+
+
+###Primarias
+
+Para las escuelas primarias podemos consultar estos resultados por escuela en la tabla siguiente:
+
+```{r,warning=FALSE,message=FALSE,echo=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(DT)
+
+enlace_primarias<-read.csv("ENLACE_PRIMARIAS_2009_2013.csv", stringsAsFactors = F)
+enlace_nac_primarias<-read.csv("PROMEDIOS_NACIONALES_PRIM.csv", stringsAsFactors = F)
+
+for(i in 11:18){
+  enlace_primarias[,i]<-as.numeric(enlace_primarias[,i])
+}
+
+enlace_primarias$TERCERO_ESPAÑOL[enlace_primarias$TERCERO_ESPAÑOL<5]<-NA
+enlace_primarias$TERCERO_MATEMATICAS[enlace_primarias$TERCERO_MATEMATICAS<5]<-NA
+enlace_primarias$CUARTO_ESPAÑOL[enlace_primarias$CUARTO_ESPAÑOL<5]<-NA
+enlace_primarias$CUARTO_MATEMATICAS[enlace_primarias$CUARTO_MATEMATICAS<5]<-NA
+enlace_primarias$QUINTO_ESPAÑOL[enlace_primarias$QUINTO_ESPAÑOL<5]<-NA
+enlace_primarias$QUINTO_MATEMATICAS[enlace_primarias$QUINTO_MATEMATICAS<5]<-NA
+enlace_primarias$SEXTO_ESPAÑOL[enlace_primarias$SEXTO_ESPAÑOL<5]<-NA
+enlace_primarias$SEXTO_MATEMATICAS[enlace_primarias$SEXTO_MATEMATICAS<5]<-NA
+
+enlace_primarias<-gather(enlace_primarias,GRADO,RESULTADO,11:18)
+
+enlace_nac_primarias<-gather(enlace_nac_primarias,
+                             TIPO_ESCUELA,PROM_NAC,CONAFE:PARTICULAR)
+
+enlace_primarias<-left_join(enlace_primarias,enlace_nac_primarias)
+
+enlace_primarias$DESVIACION<-enlace_primarias$RESULTADO-enlace_primarias$PROM_NAC
+
+enlace_primarias<-separate(enlace_primarias,GRADO,c("GRADO","MATERIA"),sep="_")
+
+
+tabla_1<-sample_n(enlace_primarias[,c("NOM_MUN","NOM_ESCUELA","AÑO","GRADO","MATERIA","RESULTADO","PROM_NAC")],10000)
+
+datatable(tabla_1, options = list(pageLength = 10))
+```
+
+Un histograma para la diferencia respecto a la media nacional, que en este caso la llamamos desviación, nos puede indicar que proporción de las escuelas se encuentran por abajo o encima de la media nacional, aquellas que están muy a la izquierda significa que están muy por abajo de lo que se esperaría de ellas, cuando se encuentran muy a la derecha significa que sus resultados sobresalen respecto a los demás.
+
+En general, los resultados de las primarias para Puebla, muestran que estan ligeramente por abajo de la media nacional, pero no encontramos algun campo en especial que lo estuviera haciendo particularmente peor o mejor.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+ggplot(enlace_primarias, aes(x=DESVIACION, fill=TIPO_ESCUELA)) +
+    geom_density(alpha=.3)+facet_wrap(~ AÑO)+theme(legend.position=c(.8,.3))+
+  scale_fill_brewer(palette="Spectral")
+
+ggplot(enlace_primarias, aes(x=DESVIACION, fill=GRADO)) +
+    geom_density(alpha=.3)+facet_wrap(~ AÑO)+theme(legend.position=c(.8,.3))+
+  scale_fill_brewer(palette="Spectral")
+
+ggplot(enlace_primarias, aes(x=DESVIACION, fill=MATERIA)) +
+    geom_density(alpha=.3)+facet_wrap(~AÑO)+theme(legend.position=c(.8,.3))+
+  scale_fill_brewer(palette="Dark2")
+```
+
+###Secundarias
+
+Ahora vemos los resultados para las secundarias:
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+enlace_secundarias<-read.csv("/home/jared/Dropbox/RichIT/Mejora_escuela_Puebla/Puebla/ENLACE_SECUNDARIAS_2009_2013.csv", stringsAsFactors = F)
+
+enlace_nac_secundarias<-read.csv("PROMEDIOS_NACIONALES_SEC.csv", stringsAsFactors = F)
+
+for(i in 11:16){
+  enlace_secundarias[,i]<-as.numeric(enlace_secundarias[,i])
+}
+
+enlace_secundarias$PRIMERO_ESPAÑOL[enlace_secundarias$PRIMERO_ESPAÑOL<5]<-NA
+enlace_secundarias$PRIMERO_MATEMATICAS[enlace_secundarias$PRIMERO_MATEMATICAS<5]<-NA
+enlace_secundarias$SEGUNDO_ESPAÑOL[enlace_secundarias$SEGUNDO_ESPAÑOL<5]<-NA
+enlace_secundarias$SEGUNDO_MATEMATICAS[enlace_secundarias$SEGUNDO_MATEMATICAS<5]<-NA
+enlace_secundarias$TERCERO_ESPAÑOL[enlace_secundarias$TERCERO_ESPAÑOL<5]<-NA
+enlace_secundarias$TERCERO_MATEMATICAS[enlace_secundarias$TERCERO_MATEMATICAS<5]<-NA
+
+enlace_secundarias<-gather(enlace_secundarias,GRADO,RESULTADO,11:16)
+
+enlace_nac_secundarias<-gather(enlace_nac_secundarias,
+                             TIPO_ESCUELA,PROM_NAC,GENERAL:TELESECUNDARIA)
+
+enlace_secundarias<-left_join(enlace_secundarias,enlace_nac_secundarias)
+
+enlace_secundarias$DESVIACION<-enlace_secundarias$RESULTADO-enlace_secundarias$PROM_NAC
+
+enlace_secundarias<-separate(enlace_secundarias,GRADO,c("GRADO","MATERIA"),sep="_")
+
+tabla_2<-sample_n(enlace_secundarias[,c("NOM_MUN","NOM_ESCUELA","AÑO","GRADO","MATERIA","RESULTADO","PROM_NAC")],10000)
+
+datatable(tabla_2, options = list(pageLength = 10))
+```
+
+Análizamos las diferencias, igual que con las primarias, para ver si podíamos identificar un campo en especial en el que pudieramos observar un comportamiento muy diferente respecto al promedio nacional. 
+
+En estos resultados se puede ver que los promedios se encuentran por debajo de la media nacional, incluso un poco más que los resultados de las escuelas primarias, particularmente las secundarias particulares tienen un sesgo a la izquierda, significando que lo hacen un poco peor que el promedio nacional de las secundarias nacionales. Para 2012 y 2013 las telesecundarias también se vieron un poco rezagadas respecto a sus homólogas nacionales.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+ggplot(enlace_secundarias, aes(x=DESVIACION, fill=TIPO_ESCUELA)) +
+    geom_density(alpha=.3)+facet_wrap(~ AÑO)+theme(legend.position=c(.8,.3))+
+  scale_fill_brewer(palette="Spectral")
+
+ggplot(enlace_secundarias, aes(x=DESVIACION, fill=GRADO)) +
+    geom_density(alpha=.3)+facet_wrap(~ AÑO)+theme(legend.position=c(.8,.3))+
+  scale_fill_brewer(palette="Dark2")
+
+ggplot(enlace_secundarias, aes(x=DESVIACION, fill=MATERIA)) +
+    geom_density(alpha=.3)+facet_wrap(~AÑO)+theme(legend.position=c(.8,.3))+
+  scale_fill_brewer(palette="Dark2")
+```

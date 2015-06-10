@@ -1,5 +1,5 @@
 ---
-title: "Untitled"
+title: "Recursos de las escuelas"
 author: "Carlos Jared Romero Reyes"
 date: "08/06/2015"
 output: html_document
@@ -7,7 +7,7 @@ output: html_document
 
 Uno de los objetivos principales del CEMABE es conocer la infraestructura, el equipamiento y los servicios de los centros de trabajo educativos. Por ello el Cuestionario de Inmueblei indagó las características constructivas de la escuela, los servicios básicos disponibles, la infraestructura educativa y sanitaria, así como las condiciones de la misma; las medidas de protección civil implementadas y los recursos para emergencias disponible.
 
-EL Cuestionario de Inmueble recopiló diversa información que se puede resumir en el listado siguiente:
+El Cuestionario de Inmueble recopiló diversa información que se puede resumir en el listado siguiente:
 
 * Datos de identificación del inmueble y del informante
 * Tipo de inmueble y dirección
@@ -21,7 +21,7 @@ EL Cuestionario de Inmueble recopiló diversa información que se puede resumir 
 * Mantenimiento y rehabilitación
 
 
-```{r,message=FALSE,warning=FALSE,echo=FALSE}
+```{r,message=FALSE,warning=FALSE,echo=FALSE,results='hide'}
 library(stringr)
 library(maptools)
 library(rgdal)
@@ -67,34 +67,60 @@ puntos<-sapply(1:nrow(datos_INMB),function(i){
 
 datos_INMB$lon<-t(puntos)[,1]
 datos_INMB$lat<-t(puntos)[,2]
+
+datos_INMB$nivel_edu<-datos_INMB$NIVEL
+datos_INMB$nivel_edu[datos_INMB$NIVEL==1]<-"Iinicial"
+datos_INMB$nivel_edu[datos_INMB$NIVEL==2]<-"Preescolar"
+datos_INMB$nivel_edu[datos_INMB$NIVEL==3]<-"Primaria"
+datos_INMB$nivel_edu[datos_INMB$NIVEL==4]<-"Secundaria"
+datos_INMB$nivel_edu[datos_INMB$NIVEL==5]<-"Medio superior"
+datos_INMB$nivel_edu[datos_INMB$NIVEL==6]<-"Superior"
+datos_INMB$nivel_edu[datos_INMB$NIVEL==7]<-"CAM"
+datos_INMB$nivel_edu[datos_INMB$NIVEL==8]<-"Educación especial"
+datos_INMB$nivel_edu[datos_INMB$NIVEL==9]<-"No nivel educativo"
+
+datos_INMB$nivel_edu<-factor(datos_INMB$nivel_edu,levels=
+                                  c("Inicial","Preescolar","Primaria","Secundaria",
+                                "CAM","Educación especial","No nivel educativo"))
 ```
 
+###Ubicación de todas las escuelas censadas
 
+En este gráfico podemos ver la ubicación de todas las escuelas censadas y tienen color diferente dependiendo del nivel educativo al que se enfocan. En algunos casos no hay nivel educativo porque no es una escuela propiamente, pero sí un centro de trabajo, como puede ser una biblioteca.
 
-```{r, echo=FALSE,warning=FALSE,message=FALSE, fig.width=8}
+```{r, echo=FALSE,warning=FALSE,message=FALSE, fig.height=12,fig.align='center',results='hide'}
 puebla<-readOGR("/home/jared/Dropbox/Código útil/scince/shps/pue","pue_estatal")
 
 municipios<-readRDS("/home/jared/Dropbox/Código útil/mapas_mun.rds")
 puebla_map<-municipios[municipios$CVE_ENT=="21",]
 
+paleta<-c("chartreuse3","cyan2","gold","gray100",
+          "gray90","gray80")
+
 ggplot()+
-  geom_point(data=datos_INMB, aes(x=lon,y=lat,colour=as.character(NIVEL)),size=2)+ 
-  geom_polygon(data=puebla_map,aes(x=long,y=lat,group=group),alpha=.1)+
+  geom_polygon(data=puebla_map,aes(x=long,y=lat,group=group),alpha=.8, fill="black")+
+  geom_point(data=datos_INMB, aes(x=lon,y=lat,colour=nivel_edu),size=2)+ 
   coord_fixed(ratio = 1)+
   theme(legend.position=c(.15,.8),
         axis.text.x = element_blank(),
         axis.text.y = element_blank(),axis.title.x = element_blank(),
         axis.title.y = element_blank())+
+  scale_colour_manual(values=paleta)+
   guides(colour=guide_legend(title="Nivel educativo"))+
-  scale_colour_brewer(palette="Set1")+
   ggtitle("Centros educativos en Puebla")
+```
 
+###Mapas interactivos
 
-escuelas<-datos_INMB[,c("lon","lat","NIVEL","NOMBRECT")]
-set.seed(2705)
-escuelas_samp<-sample_n(escuelas,100)
-escuelas_samp$icono<-paste("esc",escuelas_samp$NIVEL,sep="_")
-escuelas<-escuelas_samp[complete.cases(escuelas_samp),]
+Este es un mapa con solo 2,000 escuelas en donde podemos observar su ubicación espacial, podemos ver la zona en la que se encuentra y el nombre y nivel educativo de la institución. Se debe aclarar que la ubicación espacial es una aproximación que se obtuvo dado la AGEB a la que pertenece.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE, fig.width=6, fig.align='center'}
+escuelas<-datos_INMB[,c("lon","lat","NIVEL","NOMBRECT","nivel_edu")]
+escuelas<-escuelas[complete.cases(escuelas),]
+escuelas$icono<-paste("esc",escuelas$NIVEL,sep="_")
+escuelas$marcador<-paste(escuelas$NOMBRECT,escuelas$nivel_edu)
+
+escuelas_samp<-sample_n(escuelas,2000)
 
 escuela<-iconList(
   esc_1=makeIcon("School_160.png"),esc_2=makeIcon("School_161.png"),
@@ -103,10 +129,58 @@ escuela<-iconList(
   esc_7=makeIcon("School_166.png"),esc_8=makeIcon("School_167.png"),
   esc_9=makeIcon("School_168.png"))
 
-
 leaflet()%>%
   addPolygons(data=puebla)%>%
   addTiles()%>%
   addMarkers(data=escuelas_samp,~lon,~lat, icon = ~escuela[icono],
-             popup=~NOMBRECT)
+             popup=~marcador)
 ```
+
+
+###Carencias
+
+Acerca de los servicios básicos, son 2,467 escuelas que no tienen acceso a una red pública para el abastecimiento del agua. En cuestión de electricidad, 429 no tienen servicio de electricidad de ningun tipo y 720 no tienen un baño o sanitario. 
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE,fig.width=12,results='hide'}
+library(RColorBrewer)
+library(gridExtra)
+
+agua<-ggplot()+
+  geom_polygon(data=puebla_map,aes(x=long,y=lat,group=group),
+               alpha=.8, fill="black")+
+  geom_point(data=subset(datos_INMB,P17A>1), aes(x=lon,y=lat),
+             color="#FED976",size=2,alpha=.5)+
+  coord_fixed(ratio = 1)+
+  theme(legend.position="none",
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Escuelas que no reciben \n agua de la red pública")
+
+electricidad<-ggplot()+
+  geom_polygon(data=puebla_map,aes(x=long,y=lat,group=group),
+               alpha=.8, fill="black")+
+  geom_point(data=subset(datos_INMB,P18A==5), aes(x=lon,y=lat),
+             color="#FD8D3C",size=2,alpha=.5)+
+  coord_fixed(ratio = 1)+
+  theme(legend.position="none",
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Escuelas que no tienen \n servicio  de electricidad")
+
+baños<-ggplot()+
+  geom_polygon(data=puebla_map,aes(x=long,y=lat,group=group),
+               alpha=.8, fill="black")+
+  geom_point(data=subset(datos_INMB,P21==2), aes(x=lon,y=lat),
+             color="#E31A1C",size=2,alpha=.5)+
+  coord_fixed(ratio = 1)+
+  theme(legend.position="none",
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank(),axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Escuelas que no cuentan \n con baño o sanitario")
+
+grid.arrange(agua,electricidad,baños,ncol=3)
+```
+
